@@ -1,0 +1,111 @@
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List, Optional
+import os
+from google import genai
+from rag_engine import LegalRAG
+
+# --------------------------
+# CONFIGURATION
+# --------------------------
+GOOGLE_API_KEY = "AIzaSyB0Tf5waTTwUjjt3huf61IyXjeq4zcskyo"
+
+# Initialize Client (New V1 SDK)
+client = genai.Client(api_key=GOOGLE_API_KEY)
+
+app = FastAPI(title="Legal AI Assistant API")
+
+# CORS Setup
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Global RAG instance
+rag = LegalRAG()
+
+class QueryRequest(BaseModel):
+    question: str
+
+class Source(BaseModel):
+    text: str
+    source: str
+
+class QueryResponse(BaseModel):
+    answer: str
+    sources: List[Source]
+
+@app.on_event("startup")
+async def startup_event():
+    # Check if we need to ingest
+    docs_path = "../documents"
+    if os.path.exists(docs_path):
+        if not os.path.exists(rag.index_path):
+            print("Index not found. Ingesting...")
+            rag.ingest_documents(docs_path)
+        else:
+            print("Index found. Loading...")
+            rag.load_index()
+    else:
+        print("Warning: '../documents' folder not found!")
+
+@app.post("/ask", response_model=QueryResponse)
+async def ask_question(request: QueryRequest):
+    # 1. Search for relevant clauses
+    results = rag.search(request.question, top_k=5)
+    
+    if not results:
+        return QueryResponse(answer="I couldn't find any relevant clauses in the contracts to answer your question.", sources=[])
+    
+    # 2. Prepare Context for LLM
+    context_text = "\n\n".join([f"Source: {r['source']}\nContent: {r['text']}" for r in results])
+    
+    prompt = f"""You are an expert legal AI assistant. Use the following context from legal contracts to answer the user's question.
+    
+    CONTEXT:
+    {context_text}
+    
+    USER QUESTION: 
+    {request.question}
+    
+    INSTRUCTIONS:
+    1. Answer strictly based on the provided context.
+    2. Cite the specific contract names (Sources) where you found the information.
+    3. If the answer is not in the context, say "I cannot find the answer in the provided documents."
+    4. Keep the tone professional and concise.
+    """
+    
+    # 3. Generate Answer with Gemini (New Client)
+    try:
+        # Reverting to gemini-2.0-flash as requested
+        response = client.models.generate_content(
+            model="gemini-2.0-flash", 
+            contents=prompt
+        )
+        ai_answer = response.text
+    except Exception as e:
+        ai_answer = f"Error calling Google AI: {str(e)}"
+    
+    return QueryResponse(
+        answer=ai_answer,  
+        sources=[Source(text=r["text"], source=r["source"]) for r in results]
+    )
+
+@app.get("/document/{filename}")
+async def get_document(filename: str):
+    file_path = os.path.join("../documents", filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    with open(file_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    
+    return {"filename": filename, "content": content}
+
+@app.get("/")
+def read_root():
+    return {"status": "Legal AI API is running with Google GenAI V1"}
