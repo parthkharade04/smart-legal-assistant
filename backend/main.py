@@ -3,16 +3,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import os
-from google import genai
+from groq import Groq
 from rag_engine import LegalRAG
 
 # --------------------------
 # CONFIGURATION
 # --------------------------
-GOOGLE_API_KEY = "AIzaSyB0Tf5waTTwUjjt3huf61IyXjeq4zcskyo"
+# Groq API Key
+GROQ_API_KEY = "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"
 
-# Initialize Client (New V1 SDK)
-client = genai.Client(api_key=GOOGLE_API_KEY)
+# Initialize Groq Client
+client = Groq(api_key=GROQ_API_KEY)
 
 app = FastAPI(title="Legal AI Assistant API")
 
@@ -79,16 +80,25 @@ async def ask_question(request: QueryRequest):
     4. Keep the tone professional and concise.
     """
     
-    # 3. Generate Answer with Gemini (New Client)
+    # 3. Generate Answer with Groq (Llama 3)
     try:
-        # Reverting to gemini-2.0-flash as requested
-        response = client.models.generate_content(
-            model="gemini-2.0-flash", 
-            contents=prompt
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a helpful legal assistant."
+                },
+                {
+                    "role": "user",
+                    "content": prompt,
+                }
+            ],
+            model="llama-3.3-70b-versatile",
+            temperature=0.3,
         )
-        ai_answer = response.text
+        ai_answer = chat_completion.choices[0].message.content
     except Exception as e:
-        ai_answer = f"Error calling Google AI: {str(e)}"
+        ai_answer = f"Error calling Groq AI: {str(e)}"
     
     return QueryResponse(
         answer=ai_answer,  
@@ -108,4 +118,4 @@ async def get_document(filename: str):
 
 @app.get("/")
 def read_root():
-    return {"status": "Legal AI API is running with Google GenAI V1"}
+    return {"status": "Legal AI API is running with Groq Llama 3"}
