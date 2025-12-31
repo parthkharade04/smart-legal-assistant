@@ -1,0 +1,17 @@
+# Secrets
+.env
+backend/.env
+
+# Dependencies
+node_modules/
+backend/venv/
+backend/__pycache__/
+*.pyc
+
+# System
+.DS_Store
+Thumbs.db
+
+# Vector DB
+*.index
+*.pkl

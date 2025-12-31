@@ -6,11 +6,19 @@ import os
 from groq import Groq
 from rag_engine import LegalRAG
 
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
 # --------------------------
 # CONFIGURATION
 # --------------------------
 # Groq API Key
-GROQ_API_KEY = "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"
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+if not GROQ_API_KEY:
+    raise ValueError("GROQ_API_KEY not found in .env file")
 
 # Initialize Groq Client
 client = Groq(api_key=GROQ_API_KEY)
