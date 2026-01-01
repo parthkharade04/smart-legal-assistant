@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import os
-from google import genai # Kept for robust imports
+# from google import genai # Removed (Using Groq)
 from groq import Groq
 from rag_engine import LegalRAG
 from dotenv import load_dotenv
