@@ -45,6 +45,9 @@ function App() {
     scrollToBottom()
   }, [messages])
 
+  // Dynamic API URL (Load from Env or default to localhost)
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+
   const handleSearch = async (e) => {
     e.preventDefault()
     if (!query.trim()) return
@@ -57,7 +60,7 @@ function App() {
     setSources([])
 
     try {
-      const response = await fetch('http://localhost:8000/ask', {
+      const response = await fetch(`${API_BASE_URL}/ask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: userMsg.text })
@@ -81,7 +84,7 @@ function App() {
     setIsDocLoading(true)
 
     try {
-      const response = await fetch(`http://localhost:8000/document/${filename}`)
+      const response = await fetch(`${API_BASE_URL}/document/${filename}`)
       if (!response.ok) throw new Error("Failed to load")
       const data = await response.json()
       setSelectedDocContent(data.content)
