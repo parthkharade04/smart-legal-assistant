@@ -2,39 +2,42 @@
 
 A high-performance RAG (Retrieval-Augmented Generation) application designed to analyze legal contracts and answer questions with citation-backed accuracy.
 
-Built with **React (Glassmorphism UI)**, **FastAPI**, **FAISS Vector DB**, and powered by **Meta Llama 3** (via Groq) for lightning-fast inference.
+**Enterprise-Ready Architecture:** Built with **React** (Glassmorphism UI), **FastAPI**, **Pinecone Vector Cloud**, and powered by **Meta Llama 3** (via Groq) for lightning-fast inference.
 
 ## 🚀 Features
 
-- **Document Analysis**: Ingests and indexes real-world legal contracts (PDF/TXT).
-- **Smart Retrieval**: Uses FAISS vector search to find relevant clauses significantly faster than manual review.
-- **AI-Powered Synthesis**: Integrates **Llama 3-70B** to generate lawyer-like answers based *only* on the provided evidence.
+- **Document Analysis**: Ingests and indexes real-world legal contracts (PDF/TXT) into Pinecone Cloud.
+- **Smart Retrieval**: Uses **Pinecone Vector Database** for scalable, millisecond-latency searches.
+- **AI-Powered Synthesis**: Integrates **Llama 3-70B** (via Groq) to generate lawyer-like tables, lists, and summaries.
+- **Rich Text Answers**: Renders responses with Markdown (Bold, Italics, Tables).
 - **Evidence Highlighting**: Automatically highlights key terms in source documents for rapid verification.
-- **Modern UI**: Sleek, responsive React frontend with a dark-mode Glassmorphism aesthetic.
-- **Live Document Viewer**: Read full contract text securely within the app modal.
+- **Deep Dive Mode**: Instantly read full contract texts in a secure modal.
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: React.js, Vite, CSS Modules (Glassmorphism).
+- **Frontend**: React.js, Vite, React Markdown, CSS Modules (Glassmorphism).
 - **Backend**: FastAPI (Python), Uvicorn.
-- **AI/LLM**: Groq API (running Llama 3-70B), LangChain (optional integration).
-- **Vector DB**: FAISS (Facebook AI Similarity Search) - Local CPU execution.
-- **Embeddings**: Sentence-Transformers (`all-MiniLM-L6-v2`).
+- **AI/LLM**: **Groq API** (running Llama 3-70B Versatile).
+- **Vector DB**: **Pinecone** (Serverless Cloud Vector Search).
+- **Embeddings**: Sentence-Transformers (`all-MiniLM-L6-v2`) - Local.
 
 ## 📸 Screenshots
 
 | **Dashboard Interface** | **AI-Generated Answer** |
 |:---:|:---:|
 | ![Dashboard](screenshots/dashboard.png) | ![LLM Answer](screenshots/llm-generated-ans.png) |
-| **Context Retrieval (FAISS)** | **Backend Logs** |
+| **Context Retrieval (Pinecone/FAISS)** | **Backend Logs** |
 | ![FAISS Match](screenshots/faiss.png) | ![Uvicorn Logs](screenshots/main%20logs.png) |
+
+*(See more in the `screenshots/` folder)*
 
 ## ⚡ Quick Start
 
 ### Prerequisites
 - Python 3.9+
 - Node.js & npm
-- [Groq API Key](https://console.groq.com/) (Free Tier available)
+- [Groq API Key](https://console.groq.com/)
+- [Pinecone API Key](https://www.pinecone.io/)
 
 ### 1. Clone the Repo
 ```bash
@@ -49,9 +52,10 @@ python -m venv venv
 # Activate venv: `venv\Scripts\activate` (Windows) or `source venv/bin/activate` (Mac/Linux)
 pip install -r requirements.txt
 
-# Set up your Environment Variable
-# Create a .env file in /backend and add:
+# Set up your Environment Variables
+# Create a .env file in /backend with:
 # GROQ_API_KEY=your_key_here
+# PINECONE_API_KEY=your_key_here
 ```
 
 ### 3. Frontend Setup
@@ -65,12 +69,12 @@ npm run dev
 - **Backend**: `uvicorn main:app --reload --port 8000`
 - **Frontend**: Open `http://localhost:3000`
 
-## 🧠 How It Works using RAG
+## 🧠 How It Works (Cloud RAG)
 
-1. **Ingestion**: Uploaded contracts are chunked into 500-character segments.
-2. **Embedding**: Text chunks are converted into vector embeddings using `SentenceTransformer`.
-3. **Retrieval**: When you ask a question, the system finds the top 5 most similar chunks from the vector store.
-4. **Generation**: The retrieved chunks + user question are sent to **Llama 3**, which synthesizes a grounded answer.
+1. **Ingestion**: Uploaded contracts are chunked and embedded locally.
+2. **Indexing**: Vectors are uploaded to **Pinecone Cloud (Index: legal-contracts)**.
+3. **Retrieval**: When you ask a question, the system queries Pinecone for the Top 5 matches.
+4. **Generation**: The retrieved context + user question is sent to **Groq (Llama 3)**, which synthesizes a grounded answer in milliseconds.
 
 ## 🛡️ License
 MIT License.
