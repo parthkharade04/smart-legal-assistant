@@ -1,4 +1,4 @@
-# ⚖️ Domain-Grounded Smart Legal Insight Engine
+# ⚖️ JurisMind: AI Legal Insight Engine
 
 A high-performance RAG (Retrieval-Augmented Generation) application designed to analyze legal contracts and answer questions with citation-backed accuracy.
 
@@ -19,7 +19,7 @@ A high-performance RAG (Retrieval-Augmented Generation) application designed to 
 - **Backend**: FastAPI (Python), Uvicorn.
 - **AI/LLM**: **Groq API** (running Llama 3-70B Versatile).
 - **Vector DB**: **Pinecone** (Serverless Cloud Vector Search).
-- **Embeddings**: Sentence-Transformers (`all-MiniLM-L6-v2`) - Local.
+- **Embeddings**: **FastEmbed** (Lightweight ONNX implementation of `all-MiniLM-L6-v2`).
 
 ## 📸 Screenshots
 
