@@ -1,11 +1,11 @@
 fastapi
 uvicorn
 python-dotenv
-sentence-transformers
+# sentence-transformers # Removed (Too heavy for free tier)
+fastembed             # Added (Lightweight replacement)
 pinecone>=3.0.0
 groq
 pydantic
 requests
 numpy
 python-multipart
-# google-genai (Removed this as we are using Groq now, saves space)

@@ -1,7 +1,8 @@
 import os
 import glob
 from typing import List, Dict, Any
-from sentence_transformers import SentenceTransformer
+# from sentence_transformers import SentenceTransformer # Removed for Memory Efficiency
+from fastembed import TextEmbedding
 from pinecone import Pinecone
 import time
 from dotenv import load_dotenv
@@ -10,19 +11,23 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class LegalRAG:
-    def __init__(self, index_name="legal-contracts", model_name="all-MiniLM-L6-v2"):
+    def __init__(self, index_name="legal-contracts", model_name="sentence-transformers/all-MiniLM-L6-v2"):
         """
         Initializes the RAG engine with Pinecone Vector Database.
         """
         print("Initializing LegalRAG with Pinecone...")
         
-        # 1. Initialize Embeddings Model (Local CPU)
-        self.model = SentenceTransformer(model_name)
+        # 1. Initialize Embeddings Model (FastEmbed - Lightweight)
+        print(f"Loading FastEmbed model: {model_name}...")
+        self.model = TextEmbedding(model_name=model_name)
         
         # 2. Initialize Pinecone (Cloud DB)
         api_key = os.getenv("PINECONE_API_KEY")
         if not api_key:
-            raise ValueError("PINECONE_API_KEY not found in .env settings")
+            print("Warning: PINECONE_API_KEY not found in .env settings (OK for CI/CD checks)")
+            self.pc = None
+            self.index = None
+            return
             
         self.pc = Pinecone(api_key=api_key)
         self.index_name = index_name
@@ -56,7 +61,6 @@ class LegalRAG:
         total_chunks = 0
         for i, file_path in enumerate(files):
             file_name = os.path.basename(file_path)
-            # print(f"Processing {file_name}...")
             
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                 text = f.read()
@@ -65,9 +69,7 @@ class LegalRAG:
             chunks = [c.strip() for c in text.split('\n\n') if len(c.strip()) > 50]
             
             for idx, chunk in enumerate(chunks):
-                # Create unique ID for Pinecone: filename_chunkIndex
                 chunk_id = f"{file_name}_{idx}"
-                # Enforce ASCII-safe ID (Pinecone requirement)
                 chunk_id = chunk_id.encode("ascii", "ignore").decode()
                 
                 all_chunks.append(chunk)
@@ -82,7 +84,6 @@ class LegalRAG:
         print(f"Total extracted chunks: {total_chunks}")
         
         # 2. Embed and Upsert in Batches to Pinecone
-        # (This prevents RAM overflow)
         for i in range(0, len(all_chunks), batch_size):
             batch_end = min(i + batch_size, len(all_chunks))
             
@@ -90,10 +91,13 @@ class LegalRAG:
             batch_ids = all_ids[i:batch_end]
             batch_meta = all_metadata[i:batch_end]
             
-            # Generate Embeddings
-            embeddings = self.model.encode(batch_texts).tolist()
+            # Generate Embeddings (FastEmbed API)
+            # FastEmbed.embed returns a generator, convert to list
+            embeddings = list(self.model.embed(batch_texts))
+            # FastEmbed returns numpy arrays, convert to lists for Pinecone
+            embeddings = [e.tolist() for e in embeddings]
             
-            # Prepare vectors for Pinecone [(id, vector, metadata), ...]
+            # Prepare vectors for Pinecone
             vectors_to_upsert = []
             for j in range(len(batch_texts)):
                 vectors_to_upsert.append({
@@ -109,7 +113,6 @@ class LegalRAG:
             except Exception as e:
                 print(f"Error uploading batch: {e}")
                 
-            # Sleep briefly to be nice to rate limits
             time.sleep(0.5)
 
         print("Ingestion Complete! Data is now in the Cloud.")
@@ -118,8 +121,12 @@ class LegalRAG:
         """
         Embeds the query and searches Pinecone for similar vectors.
         """
-        # 1. Embed Query
-        query_embedding = self.model.encode([query])[0].tolist()
+        if not self.index:
+            return []
+
+        # 1. Embed Query (FastEmbed)
+        # embed returns generator, get first item, convert to list
+        query_embedding = list(self.model.embed([query]))[0].tolist()
         
         # 2. Query Pinecone
         try:
@@ -151,7 +158,8 @@ class LegalRAG:
         """
         print(f"Checking Pinecone Index '{self.index_name}' status...")
         try:
-            stats = self.index.describe_index_stats()
-            print(f"Index contains {stats['total_vector_count']} vectors.")
+            if self.index:
+                stats = self.index.describe_index_stats()
+                print(f"Index contains {stats['total_vector_count']} vectors.")
         except:
             print("Could not fetch stats.")
