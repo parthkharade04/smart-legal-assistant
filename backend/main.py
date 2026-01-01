@@ -3,26 +3,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import os
+from google import genai # Kept for robust imports
 from groq import Groq
 from rag_engine import LegalRAG
-
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
 load_dotenv()
 
-# --------------------------
-# CONFIGURATION
-# --------------------------
-# Groq API Key
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-
-if not GROQ_API_KEY:
-    raise ValueError("GROQ_API_KEY not found in .env file")
-
-# Initialize Groq Client
-client = Groq(api_key=GROQ_API_KEY)
-
+# App Definition
 app = FastAPI(title="Legal AI Assistant API")
 
 # CORS Setup
@@ -34,8 +22,41 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global RAG instance
-rag = LegalRAG()
+# Global Variables (Lazy Loading)
+client = None
+rag = None
+
+@app.on_event("startup")
+async def startup_event():
+    global client, rag
+    print("Starup: Initializing services...")
+    
+    # 1. Initialize Groq
+    try:
+        api_key = os.getenv("GROQ_API_KEY")
+        if api_key:
+            client = Groq(api_key=api_key)
+            print("Groq Client initialized.")
+        else:
+            print("Warning: GROQ_API_KEY not found.")
+    except Exception as e:
+        print(f"Failed to init Groq: {e}")
+
+    # 2. Initialize RAG Engine
+    try:
+        rag = LegalRAG()
+        print("RAG Engine initialized.")
+        
+        # Check Pinecone Stats
+        try:
+            stats = rag.index.describe_index_stats()
+            print(f"Pinecone Stats: {stats}")
+        except:
+            print("Could not fetch Pinecone stats.")
+            
+    except Exception as e:
+        print(f"Failed to init RAG Engine: {e}")
+        # We do NOT raise exception here, so app can start and return 500 cleanly if needed.
 
 class QueryRequest(BaseModel):
     question: str
@@ -48,29 +69,11 @@ class QueryResponse(BaseModel):
     answer: str
     sources: List[Source]
 
-@app.on_event("startup")
-async def startup_event():
-    # Check if we need to ingest documents into Pinecone
-    docs_path = "../documents"
-    if os.path.exists(docs_path):
-        try:
-            # Check if Pinecone has data
-            stats = rag.index.describe_index_stats()
-            count = stats.get('total_vector_count', 0)
-            
-            if count == 0:
-                print(f"Pinecone index is empty (count={count}). Ingesting documents...")
-                rag.ingest_documents(docs_path)
-            else:
-                print(f"Pinecone index ready. Contains {count} vectors.")
-                
-        except Exception as e:
-            print(f"Error checking Pinecone status: {e}")
-    else:
-        print("Warning: '../documents' folder not found!")
-
 @app.post("/ask", response_model=QueryResponse)
 async def ask_question(request: QueryRequest):
+    if not rag or not client:
+         raise HTTPException(status_code=503, detail="AI Services not initialized. Check server logs.")
+
     # 1. Search for relevant clauses
     results = rag.search(request.question, top_k=5)
     
@@ -122,9 +125,15 @@ async def ask_question(request: QueryRequest):
 
 @app.get("/document/{filename}")
 async def get_document(filename: str):
+    # Security: Prevent traversing up directories
+    if ".." in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
     file_path = os.path.join("../documents", filename)
     if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="Document not found")
+        # On Cloud, documents might not exist locally, so we return a placeholder or 404
+        # Ideally, we should fetch from S3 or database, but for now 404 is correct.
+        raise HTTPException(status_code=404, detail="Document content not available in cloud deployment (Privacy Mode).")
     
     with open(file_path, "r", encoding="utf-8") as f:
         content = f.read()
@@ -133,4 +142,4 @@ async def get_document(filename: str):
 
 @app.get("/")
 def read_root():
-    return {"status": "Legal AI API is running with Groq Llama 3"}
+    return {"status": "Legal AI API is running with Groq + Pinecone"}
