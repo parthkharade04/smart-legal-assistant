@@ -1,3 +1,4 @@
+import ReactMarkdown from 'react-markdown'
 import { useState, useRef, useEffect } from 'react'
 import './index.css'
 
@@ -129,9 +130,13 @@ function App() {
         <div className="chat-window">
           {messages.map((msg, idx) => (
             <div key={idx} className={`message ${msg.role}`}>
-              {msg.text.split('\n').map((line, i) => (
-                <p key={i} style={{ margin: '0 0 5px 0' }}>{line}</p>
-              ))}
+              {msg.role === 'bot' ? (
+                <div className="markdown-body">
+                  <ReactMarkdown>{msg.text}</ReactMarkdown>
+                </div>
+              ) : (
+                <p>{msg.text}</p>
+              )}
             </div>
           ))}
 

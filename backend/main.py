@@ -50,15 +50,22 @@ class QueryResponse(BaseModel):
 
 @app.on_event("startup")
 async def startup_event():
-    # Check if we need to ingest
+    # Check if we need to ingest documents into Pinecone
     docs_path = "../documents"
     if os.path.exists(docs_path):
-        if not os.path.exists(rag.index_path):
-            print("Index not found. Ingesting...")
-            rag.ingest_documents(docs_path)
-        else:
-            print("Index found. Loading...")
-            rag.load_index()
+        try:
+            # Check if Pinecone has data
+            stats = rag.index.describe_index_stats()
+            count = stats.get('total_vector_count', 0)
+            
+            if count == 0:
+                print(f"Pinecone index is empty (count={count}). Ingesting documents...")
+                rag.ingest_documents(docs_path)
+            else:
+                print(f"Pinecone index ready. Contains {count} vectors.")
+                
+        except Exception as e:
+            print(f"Error checking Pinecone status: {e}")
     else:
         print("Warning: '../documents' folder not found!")
 

@@ -15,3 +15,5 @@ Thumbs.db
 # Vector DB
 *.index
 *.pkl
+
+documents/
